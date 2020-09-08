@@ -258,10 +258,7 @@ func (e *Enforcer) LoadPolicy() error {
 	return nil
 }
 
-// LoadFilteredPolicy reloads a filtered policy from file/database.
-func (e *Enforcer) LoadFilteredPolicy(filter interface{}) error {
-	e.model.ClearPolicy()
-
+func (e *Enforcer) loadFilteredPolicy(filter interface{}) error {
 	var filteredAdapter persist.FilteredAdapter
 
 	// Attempt to cast the Adapter as a FilteredAdapter
@@ -283,6 +280,18 @@ func (e *Enforcer) LoadFilteredPolicy(filter interface{}) error {
 		}
 	}
 	return nil
+}
+
+// LoadFilteredPolicy reloads a filtered policy from file/database.
+func (e *Enforcer) LoadFilteredPolicy(filter interface{}) error {
+	e.model.ClearPolicy()
+
+	return e.loadFilteredPolicy(filter)
+}
+
+// LoadIncrementalFilteredPolicy append a filtered policy from file/database.
+func (e *Enforcer) LoadIncrementalFilteredPolicy(filter interface{}) error {
+	return e.loadFilteredPolicy(filter)
 }
 
 // IsFiltered returns true if the loaded policy has been filtered.
@@ -437,7 +446,11 @@ func (e *Enforcer) enforce(matcher string, explains *[]string, rvals ...interfac
 				for _, ruleName := range ruleNames {
 					if j, ok := parameters.pTokens[ruleName]; ok {
 						rule := util.EscapeAssertion(pvals[j])
-						expWithRule = util.ReplaceEval(expWithRule, rule)
+						if strings.Contains(rule, ">") || strings.Contains(rule, "<") || strings.Contains(rule, "=") {
+							expWithRule = util.ReplaceEval(expWithRule, rule)
+						} else {
+							expWithRule = util.ReplaceEval(expWithRule, "false")
+						}
 					} else {
 						return false, errors.New("please make sure rule exists in policy when using eval() in matcher")
 					}
